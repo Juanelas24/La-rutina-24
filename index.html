@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0F1620" />
+<title>Plan Anselmi</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: #0F1620; overscroll-behavior-y: none; }
+  #root { min-height: 100vh; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .spin-icon { animation: spin 1s linear infinite; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+function Dumbbell(props) {
+  return React.createElement("span", { style: { fontSize: props.size || 18, lineHeight: 1 } }, "🏋️");
+}
+function Flame(props) {
+  return React.createElement("span", { style: { fontSize: props.size || 18, lineHeight: 1 } }, "🔥");
+}
+function Plus(props) {
+  return React.createElement("span", { style: { fontSize: props.size || 18, lineHeight: 1 } }, "＋");
+}
+function Ruler(props) {
+  return React.createElement("span", { style: { fontSize: props.size || 18, lineHeight: 1 } }, "📏");
+}
+function X(props) {
+  return React.createElement("span", { style: { fontSize: props.size || 18, lineHeight: 1 } }, "✕");
+}
+function ChevronDown(props) {
+  const rot = props.style && props.style.transform ? props.style.transform : "none";
+  return React.createElement("span", { style: { fontSize: props.size || 18, lineHeight: 1, display: "inline-block", transition: "transform .15s", transform: rot } }, "⌄");
+}
+function Loader2(props) {
+  return React.createElement("span", { className: "spin-icon", style: { fontSize: props.size || 18, lineHeight: 1, display: "inline-block" } }, "↻");
+}
+
+
+/* ---------------------------------------------------------
+   TOKENS
+   bg   #0F1620 (cancha de noche)
+   surf #17212C
+   surf2#1E2A38
+   line #2B3947
+   ink  #F2EFE8 (tiza)
+   mute #8A94A6
+   ora  #FF7A29 (pelota/parquet)
+   gold #FFC857 (linea de tres)
+   grn  #4ADE80 (RIR ok)
+--------------------------------------------------------- */
+const C = {
+  bg: "#0F1620",
+  surf: "#17212C",
+  surf2: "#1E2A38",
+  line: "#2B3947",
+  ink: "#F2EFE8",
+  mute: "#8A94A6",
+  ora: "#FF7A29",
+  gold: "#FFC857",
+  grn: "#4ADE80",
+};
+
+const SCHEDULE = [
+  { d: "LUN", t: "Pierna A" },
+  { d: "MAR", t: "Torso A" },
+  { d: "MIE", t: "Pierna B" },
+  { d: "JUE", t: "Torso B" },
+  { d: "VIE", t: "Partido" },
+  { d: "SAB", t: "Descanso" },
+  { d: "DOM", t: "Descanso" },
+];
+
+const DAYS = [
+  { id: "torsoA", label: "Torso A", short: "TA" },
+  { id: "torsoB", label: "Torso B", short: "TB" },
+  { id: "piernaA", label: "Pierna A", short: "PA" },
+  { id: "piernaB", label: "Pierna B", short: "PB" },
+];
+
+// field3: 'rir' -> selector 0/1/2/3+  |  'note' -> botones rápidos de calidad
+// sets: cantidad de series a loguear individualmente
+const EX = {
+  torsoA: {
+    label: "TORSO A",
+    focus: "Hipertrofia · 8–12 reps · 0–1 RIR",
+    color: C.ora,
+    items: [
+      { id: "banca-plana", name: "Press de banca plano", presc: "4 series · 8-12 reps", sets: 4, cue: "Motor principal de empuje. Bajá controlado, subí fuerte.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "jalon-pecho", name: "Jalón al pecho", presc: "4 series · 8-12 reps", sets: 4, cue: "Escápulas abajo antes de tirar. Sentí el dorsal, no el brazo.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "press-militar", name: "Press militar barra", presc: "3 series · 8-12 reps", sets: 3, cue: "Core apretado, glúteo apretado. Nada de arquear la lumbar.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "remo-polea", name: "Remo polea", presc: "3 series · 8-12 reps", sets: 3, cue: "Pausa 1 seg contraído. Codos pegados al cuerpo.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "vuelo-lateral-a", name: "Vuelo lateral mancuerna", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: peso liviano, más reps, menos estrés articular en el hombro. Deltoides lateral — el hueco de tu rutina.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "face-pull-a", name: "Face pull", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: peso liviano, más reps. Salud de hombro para básquet — equilibra todo el press que hacés.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "curl-biceps", name: "Curl de bíceps", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: sin balancear el cuerpo. Que labure el bíceps, no la espalda.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "ext-triceps", name: "Extensión de tríceps", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: codos fijos, todo el recorrido.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+    ],
+  },
+  torsoB: {
+    label: "TORSO B",
+    focus: "Hipertrofia · 8–12 reps · 0–1 RIR",
+    color: C.ora,
+    items: [
+      { id: "banca-inclinada", name: "Press banco inclinado mancuernas", presc: "4 series · 8-12 reps", sets: 4, cue: "Pecho alto/clavicular, complementa el plano de Torso A.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "remo-unilateral", name: "Remo unilateral mancuerna", presc: "3 series · 8-12 reps", sets: 3, cue: "Rango completo, sentí el estiramiento abajo.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "apertura-cable", name: "Apertura en cable", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: peso liviano, más reps. Movimiento de abrazo, codo con leve flexión fija.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "face-pull-b", name: "Face pull", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio. Sumado a Torso A: 6 series/semana totales de deltoides posterior.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "vuelo-lateral-polea", name: "Vuelo lateral polea", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: tensión constante — el complemento ideal a la mancuerna de Torso A.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "curl-martillo", name: "Bíceps martillo banco inclinado", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: brazo bien estirado atrás, aísla el bíceps.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "press-frances", name: "Press francés", presc: "3 series · 12-15 reps", sets: 3, cue: "Accesorio: codos quietos apuntando al techo.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+    ],
+  },
+  piernaA: {
+    label: "PIERNA A",
+    focus: "Fuerza máxima + activación · técnica manda",
+    color: C.gold,
+    items: [
+      { id: "pogo", name: "Pogo jumps", presc: "2 x 10", sets: 2, cue: "Tobillo rígido, contacto corto. Activación, no cansancio.", f1: null, f2: "Reps", f3: "note" },
+      { id: "sentadilla", name: "Sentadilla trasera", presc: "4 x 5", sets: 4, cue: "Técnica manda sobre el peso. Subida explosiva siempre.", f1: "Peso (kg)", f2: "Reps", f3: "note" },
+      { id: "trapbar", name: "Trap bar deadlift", presc: "3 x 5", sets: 3, cue: "Sin dolor lumbar. Progresá solo si la técnica está sólida.", f1: "Peso (kg)", f2: "Reps", f3: "note" },
+      { id: "bulgara", name: "Sentadilla búlgara", presc: "3 x 6-8 por pierna", sets: 3, cue: "Tu clave para el salto a un pie.", f1: "Peso (kg)", f2: "Reps/pierna", f3: "note" },
+      { id: "gemelo-pie", name: "Elevación talón de pie", presc: "3-4 x 8-10", sets: 4, cue: "Pausa 1 seg arriba. El resorte del despegue.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "plancha-frontal", name: "Plancha frontal", presc: "3 x 30 seg", sets: 3, cue: "El chasis que transmite la potencia de la pierna.", f1: null, f2: "Segundos", f3: "note" },
+      { id: "pallof", name: "Pallof press", presc: "3 x 10 por lado", sets: 3, cue: "Anti-rotación — resistí que te desestabilicen.", f1: "Nivel/kg", f2: "Reps/lado", f3: "note" },
+    ],
+  },
+  piernaB: {
+    label: "PIERNA B",
+    focus: "Potencia + frenado/lateralidad · velocidad manda",
+    color: C.gold,
+    items: [
+      { id: "saltos-bajos", name: "Saltos verticales bajos", presc: "4 x 5", sets: 4, cue: "Aterrizaje silencioso. Si suena el piso, aterrizaje mal hecho.", f1: null, f2: "Reps", f3: "note" },
+      { id: "jump-squat", name: "Jump squat liviano", presc: "3 x 5", sets: 3, cue: "Peso liviano SIEMPRE. 100% velocidad, no carga.", f1: "Peso (kg)", f2: "Reps", f3: "note" },
+      { id: "zancada", name: "Zancada / step-up", presc: "3 x 8 por pierna", sets: 3, cue: "Control en el descenso, potencia en la subida.", f1: "Peso (kg)", f2: "Reps/pierna", f3: "rir" },
+      { id: "saltos-laterales", name: "Saltos laterales cortos", presc: "3 x 6 por lado", sets: 3, cue: "Tu segundo objetivo: cambio de dirección arranca acá.", f1: null, f2: "Reps/lado", f3: "note" },
+      { id: "gemelo-sentado", name: "Elevación talón sentado", presc: "3 x 10-12", sets: 3, cue: "Sóleo — el amortiguador que menos se entrena y más se lesiona.", f1: "Peso (kg)", f2: "Reps", f3: "rir" },
+      { id: "plancha-lateral", name: "Plancha lateral", presc: "3 x 20 seg por lado", sets: 3, cue: "Estabilidad de tronco en apoyo unilateral.", f1: null, f2: "Segundos", f3: "note" },
+      { id: "dead-bug", name: "Dead bug", presc: "3 x 8 por lado", sets: 3, cue: "Core dinámico — integra brazo y pierna sin perder estabilidad.", f1: null, f2: "Reps/lado", f3: "note" },
+    ],
+  },
+};
+
+const RIR_OPTS = ["0", "1", "2", "3+"];
+
+const NOTE_OPTS = [
+  { label: "Explosivo 💥", value: "Explosivo, técnica sólida" },
+  { label: "Técnica floja", value: "Técnica floja" },
+  { label: "Faltó velocidad", value: "Faltó velocidad/explosividad" },
+  { label: "Molestia/dolor", value: "Molestia o dolor" },
+];
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fmtDate(iso) {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
+
+function sortByDate(entries) {
+  return [...entries].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
+function emptySetRows(n) {
+  return Array.from({ length: n }, () => ({ v1: "", v2: "" }));
+}
+
+function formatSetsSummary(sets, hasWeight) {
+  const reps = sets.map((s) => s.v2 || "-").join("/");
+  if (!hasWeight) return reps;
+  const weights = sets.map((s) => s.v1 || "-");
+  const allSame = weights.every((w) => w === weights[0]);
+  const weightStr = allSame ? weights[0] : weights.join("/");
+  return `${weightStr}kg × ${reps}`;
+}
+
+/* ---------------- storage helpers ---------------- */
+async function loadLog(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return [];
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+async function saveLog(key, entries) {
+  try {
+    localStorage.setItem(key, JSON.stringify(entries));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ---------------- Exercise Card ---------------- */
+// Normaliza una entrada vieja (v1/v2/v3 de una sola serie) al nuevo formato { sets: [...] }
+function normalizeEntry(e) {
+  if (e.sets) return e;
+  return { date: e.date, sets: [{ v1: e.v1, v2: e.v2 }], v3: e.v3 };
+}
+
+function ExerciseCard({ ex, dayId, accent }) {
+  const storageKey = `log:${dayId}-${ex.id}`;
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState(null);
+  const [form, setForm] = useState({ date: todayISO(), sets: emptySetRows(ex.sets), v3: ex.f3 === "rir" ? "0" : "" });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
+  useEffect(() => {
+    if (open && entries === null) {
+      loadLog(storageKey).then((data) => setEntries(sortByDate(data.map(normalizeEntry))));
+    }
+  }, [open]);
+
+  const setRow = (idx, field, value) => {
+    setForm((f) => {
+      const sets = f.sets.slice();
+      sets[idx] = { ...sets[idx], [field]: value };
+      return { ...f, sets };
+    });
+  };
+
+  // Autocompletar el peso hacia las series siguientes que todavía estén vacías.
+  // Se dispara al salir del campo (blur), no en cada tecla, para no copiar un
+  // número a medio escribir (ej: tipear "45" copiaba el "4" antes del "5").
+  const propagateWeight = (idx) => {
+    setForm((f) => {
+      const value = f.sets[idx].v1;
+      if (!value) return f;
+      const sets = f.sets.slice();
+      for (let j = idx + 1; j < sets.length; j++) {
+        if (sets[j].v1 === "") {
+          sets[j] = { ...sets[j], v1: value };
+        }
+      }
+      return { ...f, sets };
+    });
+  };
+
+  const hasAnyRep = form.sets.some((s) => s.v2);
+
+  const addEntry = useCallback(async () => {
+    if (!hasAnyRep || !form.date) return;
+    setSaving(true);
+    setSaveError(false);
+    const newEntry = {
+      date: form.date,
+      sets: form.sets.filter((s) => s.v2),
+      v3: form.v3,
+    };
+    const updated = sortByDate([...(entries || []), newEntry]);
+    const ok = await saveLog(storageKey, updated);
+    if (ok) {
+      setEntries(updated);
+      setForm({ date: todayISO(), sets: emptySetRows(ex.sets), v3: ex.f3 === "rir" ? "0" : "" });
+    } else {
+      setSaveError(true);
+    }
+    setSaving(false);
+  }, [form, entries, storageKey, hasAnyRep]);
+
+  const removeEntry = async (idx) => {
+    const updated = entries.filter((_, i) => i !== idx);
+    const ok = await saveLog(storageKey, updated);
+    if (ok) setEntries(updated);
+    else setSaveError(true);
+  };
+
+  const last = entries && entries.length > 0 ? entries[entries.length - 1] : null;
+
+  return (
+    <div
+      style={{
+        background: C.surf,
+        border: `1px solid ${C.line}`,
+        borderRadius: 12,
+        marginBottom: 10,
+        overflow: "hidden",
+      }}
+    >
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between"
+        style={{ padding: "12px 14px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: accent, flexShrink: 0 }} />
+            <span style={{ color: C.ink, fontWeight: 700, fontSize: 14.5, letterSpacing: 0.2 }}>
+              {ex.name}
+            </span>
+          </div>
+          <div style={{ color: C.mute, fontSize: 12, marginTop: 3, marginLeft: 14 }}>
+            {ex.presc}
+            {last && (
+              <span style={{ color: C.mute }}>
+                {"  ·  último: "}
+                {formatSetsSummary(last.sets, !!ex.f1)}
+                {ex.f3 === "rir" ? ` @RIR ${last.v3}` : last.v3 ? ` · ${last.v3}` : ""}
+              </span>
+            )}
+          </div>
+        </div>
+        <ChevronDown
+          size={18}
+          color={C.mute}
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}
+        />
+      </button>
+
+      {open && (
+        <div style={{ padding: "0 14px 14px 14px", borderTop: `1px solid ${C.line}` }}>
+          <p style={{ color: C.gold, fontSize: 12, margin: "10px 0 12px 0", lineHeight: 1.4, fontStyle: "italic" }}>
+            "{ex.cue}"
+          </p>
+
+          {entries === null ? (
+            <div className="flex items-center" style={{ gap: 6, color: C.mute, fontSize: 12, padding: "8px 0" }}>
+              <Loader2 size={14} className="animate-spin" />
+              Cargando registro...
+            </div>
+          ) : (
+            <>
+              {entries.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  {entries
+                    .slice()
+                    .reverse()
+                    .slice(0, 6)
+                    .map((e, i) => {
+                      const realIdx = entries.length - 1 - i;
+                      return (
+                        <div
+                          key={realIdx}
+                          style={{
+                            padding: "8px 10px",
+                            background: C.surf2,
+                            borderRadius: 8,
+                            marginBottom: 5,
+                          }}
+                        >
+                          <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+                            <span style={{ color: C.mute, fontSize: 11 }}>{fmtDate(e.date)}</span>
+                            <button
+                              onClick={() => removeEntry(realIdx)}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}
+                            >
+                              <X size={12} color={C.mute} />
+                            </button>
+                          </div>
+                          <div className="flex" style={{ gap: 5, flexWrap: "wrap" }}>
+                            {e.sets.map((s, si) => (
+                              <span
+                                key={si}
+                                style={{
+                                  background: C.surf,
+                                  border: `1px solid ${C.line}`,
+                                  borderRadius: 6,
+                                  padding: "2px 7px",
+                                  fontSize: 11.5,
+                                  color: C.ink,
+                                }}
+                              >
+                                {ex.f1 && s.v1 ? `${s.v1}kg × ` : ""}
+                                {s.v2}
+                              </span>
+                            ))}
+                            {(ex.f3 === "rir" || e.v3) && (
+                              <span
+                                style={{
+                                  fontSize: 11.5,
+                                  color: ex.f3 === "rir" ? C.grn : C.mute,
+                                  padding: "2px 2px",
+                                  alignSelf: "center",
+                                }}
+                              >
+                                {ex.f3 === "rir" ? `RIR ${e.v3}` : e.v3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 3 }}>Fecha de la sesión</label>
+                <input
+                  type="date"
+                  value={form.date}
+                  max={todayISO()}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  style={{
+                    width: "100%",
+                    background: C.surf2,
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    color: C.ink,
+                    fontSize: 13,
+                    colorScheme: "dark",
+                  }}
+                />
+              </div>
+
+              <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 4 }}>
+                Cargá cada serie ({ex.f2}{ex.f1 ? ` y ${ex.f1}` : ""})
+              </label>
+              <div style={{ marginBottom: 10 }}>
+                {form.sets.map((row, idx) => (
+                  <div key={idx} className="flex items-center" style={{ gap: 6, marginBottom: 6 }}>
+                    <span style={{ color: C.mute, fontSize: 11, width: 16, flexShrink: 0 }}>{idx + 1}</span>
+                    {ex.f1 && (
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={row.v1}
+                        onChange={(e) => setRow(idx, "v1", e.target.value)}
+                        onBlur={() => propagateWeight(idx)}
+                        placeholder={ex.f1}
+                        style={{
+                          flex: 1,
+                          background: C.surf2,
+                          border: `1px solid ${C.line}`,
+                          borderRadius: 8,
+                          padding: "7px 9px",
+                          color: C.ink,
+                          fontSize: 13,
+                          minWidth: 0,
+                        }}
+                      />
+                    )}
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={row.v2}
+                      onChange={(e) => setRow(idx, "v2", e.target.value)}
+                      placeholder={ex.f2}
+                      style={{
+                        flex: 1,
+                        background: C.surf2,
+                        border: `1px solid ${C.line}`,
+                        borderRadius: 8,
+                        padding: "7px 9px",
+                        color: C.ink,
+                        fontSize: 13,
+                        minWidth: 0,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                {ex.f3 === "rir" ? (
+                  <>
+                    <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 4 }}>
+                      RIR última serie
+                    </label>
+                    <div className="flex" style={{ gap: 6 }}>
+                      {RIR_OPTS.map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => setForm((f) => ({ ...f, v3: r }))}
+                          style={{
+                            flex: 1,
+                            padding: "7px 0",
+                            borderRadius: 8,
+                            border: `1px solid ${form.v3 === r ? C.grn : C.line}`,
+                            background: form.v3 === r ? "rgba(74,222,128,0.15)" : C.surf2,
+                            color: form.v3 === r ? C.grn : C.mute,
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 4 }}>
+                      Calidad (técnica / velocidad)
+                    </label>
+                    <div className="grid grid-cols-2" style={{ gap: 6 }}>
+                      {NOTE_OPTS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setForm((f) => ({ ...f, v3: opt.value }))}
+                          style={{
+                            padding: "7px 6px",
+                            borderRadius: 8,
+                            border: `1px solid ${form.v3 === opt.value ? accent : C.line}`,
+                            background: form.v3 === opt.value ? `${accent}26` : C.surf2,
+                            color: form.v3 === opt.value ? accent : C.mute,
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {saveError && (
+                <div
+                  style={{
+                    background: "rgba(248,113,113,0.12)",
+                    border: "1px solid #F87171",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    marginBottom: 8,
+                    color: "#F87171",
+                    fontSize: 11.5,
+                  }}
+                >
+                  No se pudo guardar. No cerrés el artefacto — tocá "Registrar sesión" de nuevo.
+                </div>
+              )}
+
+              <button
+                onClick={addEntry}
+                disabled={!hasAnyRep || !form.date || saving}
+                className="w-full flex items-center justify-center"
+                style={{
+                  gap: 6,
+                  padding: "9px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  background: !hasAnyRep || !form.date ? C.line : accent,
+                  color: !hasAnyRep || !form.date ? C.mute : "#12181f",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: !hasAnyRep || !form.date ? "default" : "pointer",
+                }}
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Registrar sesión
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Jump Tracker ---------------- */
+function JumpTracker() {
+  const key = "jump-log";
+  const [entries, setEntries] = useState(null);
+  const [form, setForm] = useState({ date: todayISO(), parado: "", dosPies: "", unPie: "" });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
+  useEffect(() => {
+    loadLog(key).then((data) => setEntries(sortByDate(data)));
+  }, []);
+
+  const add = async () => {
+    if (!form.parado || !form.dosPies || !form.date) return;
+    setSaving(true);
+    setSaveError(false);
+    const entry = { ...form };
+    const updated = sortByDate([...(entries || []), entry]);
+    const ok = await saveLog(key, updated);
+    if (ok) {
+      setEntries(updated);
+      setForm({ date: todayISO(), parado: "", dosPies: "", unPie: "" });
+    } else {
+      setSaveError(true);
+    }
+    setSaving(false);
+  };
+
+  const removeEntry = async (idx) => {
+    const updated = entries.filter((_, i) => i !== idx);
+    const ok = await saveLog(key, updated);
+    if (ok) setEntries(updated);
+    else setSaveError(true);
+  };
+
+  return (
+    <div>
+      <div
+        style={{
+          background: C.surf,
+          border: `1px solid ${C.line}`,
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 14,
+        }}
+      >
+        <div className="flex items-center" style={{ gap: 8, marginBottom: 4 }}>
+          <Ruler size={16} color={C.gold} />
+          <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>Objetivo: primer dunk</span>
+        </div>
+        <p style={{ color: C.mute, fontSize: 12, marginBottom: 14, lineHeight: 1.4 }}>
+          Medí siempre en las mismas condiciones: entrada en calor, mismo lugar. Cada 2-4 semanas alcanza.
+        </p>
+
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 3 }}>Fecha de la medición</label>
+          <input
+            type="date"
+            value={form.date}
+            max={todayISO()}
+            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+            style={{
+              width: "100%",
+              background: C.surf2,
+              border: `1px solid ${C.line}`,
+              borderRadius: 8,
+              padding: "8px 10px",
+              color: C.ink,
+              fontSize: 13,
+              colorScheme: "dark",
+            }}
+          />
+        </div>
+
+        <div className="grid grid-cols-3" style={{ gap: 8, marginBottom: 10 }}>
+          <div>
+            <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 3 }}>Alcance parado (cm)</label>
+            <input
+              type="number"
+              value={form.parado}
+              onChange={(e) => setForm((f) => ({ ...f, parado: e.target.value }))}
+              style={{ width: "100%", background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 8px", color: C.ink, fontSize: 13 }}
+            />
+          </div>
+          <div>
+            <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 3 }}>Salto 2 pies (cm)</label>
+            <input
+              type="number"
+              value={form.dosPies}
+              onChange={(e) => setForm((f) => ({ ...f, dosPies: e.target.value }))}
+              style={{ width: "100%", background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 8px", color: C.ink, fontSize: 13 }}
+            />
+          </div>
+          <div>
+            <label style={{ color: C.mute, fontSize: 10.5, display: "block", marginBottom: 3 }}>1 pie c/carrera (cm)</label>
+            <input
+              type="number"
+              value={form.unPie}
+              onChange={(e) => setForm((f) => ({ ...f, unPie: e.target.value }))}
+              style={{ width: "100%", background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 8px", color: C.ink, fontSize: 13 }}
+            />
+          </div>
+        </div>
+
+        {saveError && (
+          <div
+            style={{
+              background: "rgba(248,113,113,0.12)",
+              border: "1px solid #F87171",
+              borderRadius: 8,
+              padding: "8px 10px",
+              marginBottom: 10,
+              color: "#F87171",
+              fontSize: 11.5,
+            }}
+          >
+            No se pudo guardar. No cerrés el artefacto — tocá "Registrar medición" de nuevo.
+          </div>
+        )}
+
+        <button
+          onClick={add}
+          disabled={!form.parado || !form.dosPies || !form.date || saving}
+          className="w-full flex items-center justify-center"
+          style={{
+            gap: 6,
+            padding: "9px 0",
+            borderRadius: 8,
+            border: "none",
+            background: !form.parado || !form.dosPies || !form.date ? C.line : C.gold,
+            color: !form.parado || !form.dosPies || !form.date ? C.mute : "#12181f",
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Registrar medición
+        </button>
+      </div>
+
+      {entries === null ? (
+        <div className="flex items-center" style={{ gap: 6, color: C.mute, fontSize: 12 }}>
+          <Loader2 size={14} className="animate-spin" /> Cargando...
+        </div>
+      ) : entries.length === 0 ? (
+        <p style={{ color: C.mute, fontSize: 12.5, textAlign: "center", padding: "20px 0" }}>
+          Todavía no cargaste ninguna medición. Metele la primera hoy.
+        </p>
+      ) : (
+        entries
+          .slice()
+          .reverse()
+          .map((e, i) => {
+            const realIdx = entries.length - 1 - i;
+            const jump2 = e.dosPies - e.parado;
+            const jump1 = e.unPie ? e.unPie - e.parado : null;
+            return (
+              <div
+                key={realIdx}
+                style={{
+                  background: C.surf,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  marginBottom: 8,
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span style={{ color: C.mute, fontSize: 11.5 }}>{fmtDate(e.date)}</span>
+                  <button onClick={() => removeEntry(realIdx)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+                    <X size={13} color={C.mute} />
+                  </button>
+                </div>
+                <div className="flex items-center" style={{ gap: 14, marginTop: 4 }}>
+                  <div>
+                    <div style={{ color: C.gold, fontSize: 18, fontWeight: 800 }}>{jump2} cm</div>
+                    <div style={{ color: C.mute, fontSize: 10 }}>salto 2 pies</div>
+                  </div>
+                  {jump1 !== null && (
+                    <div>
+                      <div style={{ color: C.ora, fontSize: 18, fontWeight: 800 }}>{jump1} cm</div>
+                      <div style={{ color: C.mute, fontSize: 10 }}>salto 1 pie c/carrera</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+      )}
+    </div>
+  );
+}
+
+/* ---------------- App ---------------- */
+function App() {
+  const [tab, setTab] = useState("torsoA");
+  const day = EX[tab];
+
+  return (
+    <div style={{ background: C.bg, minHeight: "100vh", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* Header */}
+      <div style={{ padding: "22px 16px 14px 16px", borderBottom: `1px solid ${C.line}` }}>
+        <div className="flex items-center" style={{ gap: 8 }}>
+          <Flame size={20} color={C.ora} />
+          <h1 style={{ color: C.ink, fontSize: 19, fontWeight: 900, letterSpacing: 0.5, margin: 0 }}>
+            PLAN DE ENTRENAMIENTO
+          </h1>
+        </div>
+        <p style={{ color: C.mute, fontSize: 12.5, margin: "3px 0 0 28px" }}>Prof. Horacio Anselmi</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex" style={{ gap: 6, padding: "12px 16px 0 16px", overflowX: "auto" }}>
+        {DAYS.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => setTab(d.id)}
+            style={{
+              flex: "0 0 auto",
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: `1px solid ${tab === d.id ? EX[d.id].color : C.line}`,
+              background: tab === d.id ? EX[d.id].color : "transparent",
+              color: tab === d.id ? "#12181f" : C.mute,
+              fontWeight: 700,
+              fontSize: 12.5,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {d.label}
+          </button>
+        ))}
+        <button
+          onClick={() => setTab("salto")}
+          style={{
+            flex: "0 0 auto",
+            padding: "8px 14px",
+            borderRadius: 999,
+            border: `1px solid ${tab === "salto" ? C.gold : C.line}`,
+            background: tab === "salto" ? C.gold : "transparent",
+            color: tab === "salto" ? "#12181f" : C.mute,
+            fontWeight: 700,
+            fontSize: 12.5,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Ruler size={12} /> Salto
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: "16px 16px 40px 16px" }}>
+        {tab === "salto" ? (
+          <JumpTracker />
+        ) : (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <div className="flex items-center" style={{ gap: 6 }}>
+                <Dumbbell size={16} color={day.color} />
+                <span style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{day.label}</span>
+              </div>
+              <p style={{ color: C.mute, fontSize: 11.5, margin: "2px 0 0 22px" }}>{day.focus}</p>
+            </div>
+            {day.items.map((ex) => (
+              <ExerciseCard key={ex.id} ex={ex} dayId={tab} accent={day.color} />
+            ))}
+          </>
+        )}
+      </div>
+
+      <div style={{ textAlign: "center", paddingBottom: 24 }}>
+        <span style={{ color: C.mute, fontSize: 10.5 }}>Tocá un ejercicio para ver el cue y cargar tu registro · A romperse el alma 💪</span>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
